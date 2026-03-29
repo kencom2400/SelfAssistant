@@ -239,6 +239,131 @@ class GraphState(TypedDict):
 
 ---
 
+## 3-B. メモリ・コンテキスト管理設計
+
+### 3-B.1 メモリ全体構成
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       Memory Manager                            │
+│            （全エージェント共通の統合アクセス層）                 │
+├──────────────────┬────────────────────┬────────────────────────┤
+│  Working Memory  │  Short-term Memory │  Long-term Memory      │
+│  （作業記憶）     │  （短期記憶）       │  （長期記憶）           │
+│                  │                    │                        │
+│  GraphState      │  LangGraph         │  LangGraph Store       │
+│  （実行中のみ）   │  Checkpointer      │  + ChromaDB            │
+│                  │  (SQLite)          │  （意味検索対応）        │
+└──────────────────┴────────────────────┴────────────────────────┘
+```
+
+### 3-B.2 メモリ種別と用途
+
+| 種別 | 保存場所 | 生存期間 | 用途 |
+|---|---|---|---|
+| **Working Memory** | GraphState（オンメモリ） | グラフ実行中のみ | 処理中の入力・中間結果・エージェント間受け渡し |
+| **Short-term Memory** | SQLite (Checkpointer) | セッション〜数日 | 会話履歴・直近の文脈・セッション再開 |
+| **Long-term Memory** | SQLite (Store) + ChromaDB | 永続 | ユーザーの好み・重要な決定・タスク履歴 |
+
+### 3-B.3 長期記憶のデータ設計
+
+LangGraph Storeで管理するメモリは、**namespace** で種別を分け、ChromaDBで意味検索可能にする。
+
+```
+namespace/
+├── user_profile/         # ユーザーの好み・属性
+│   └── preferences       # 例："Pythonが得意" "毎朝9時に報告希望"
+├── important_facts/      # 重要な事実・決定事項
+│   └── {fact_id}         # 例:"プロジェクトXはDjangoで実装"
+├── task_context/         # タスク関連の文脈
+│   └── {task_id}         # 各タスクの背景・経緯
+└── conversation_summary/ # 過去会話の要約（圧縮済み）
+    └── {session_id}
+```
+
+### 3-B.4 意味検索の仕組み
+
+```
+ユーザー入力 or エージェント処理
+        │
+        ▼
+  EmbeddingModel          ← sentence-transformers（ローカル実行）
+  （テキスト → ベクトル）       APIコスト不要・プライバシー保護
+        │
+        ▼
+  ChromaDB（ベクトル検索）
+        │
+        ▼
+  関連メモリ取得（Top-K件）
+        │
+        ▼
+  GraphStateに注入 → LLMのコンテキストとして利用
+```
+
+**採用技術の理由:**
+- `sentence-transformers`: ローカル実行のため API コスト不要・プライバシー安全
+- `ChromaDB`: ローカル永続化が容易、Pythonネイティブ、セットアップが軽量
+
+### 3-B.5 エージェント間のメモリ共有
+
+すべてのエージェントは同一の `MemoryManager` を通じてメモリにアクセスする。
+エージェント固有の記憶と共有記憶を namespace で分離する。
+
+```
+                    MemoryManager
+                         │
+          ┌──────────────┼──────────────┐
+          │              │              │
+   [TaskAgent]    [InfoAgent]    [GeneralAgent]
+          │              │              │
+          └──────────────┼──────────────┘
+                         │
+              共有namespace（重要な事実・ユーザー情報）
+              ＋ 個別namespace（各エージェント固有）
+```
+
+### 3-B.6 コンテキストウィンドウ管理
+
+Claude API のトークン上限に対して以下の戦略で制御する：
+
+```python
+# コンテキスト組み立て優先順位（上ほど優先）
+context = [
+    system_prompt,                    # 固定（エージェント定義）
+    *long_term_memory_relevant[:3],   # 意味検索で取得した関連記憶（上位3件）
+    *conversation_history[-20:],      # 直近20件の会話履歴
+    user_input,                       # 今回の入力
+]
+# 合計トークン数を監視し、上限(200k)の80%を超えたら
+# conversation_historyの件数を動的に削減
+```
+
+### 3-B.7 メモリ保存のトリガー
+
+エージェントが以下を判断した際に自動的に長期記憶へ保存する：
+
+| トリガー | 例 | 保存先namespace |
+|---|---|---|
+| ユーザーの属性・好みが判明 | "私はPythonが得意です" | `user_profile` |
+| 重要な決定・合意事項 | "このプロジェクトはFlaskで実装する" | `important_facts` |
+| タスクの背景情報 | 新規タスク登録時の文脈 | `task_context` |
+| セッション終了時 | 会話の要約を自動生成 | `conversation_summary` |
+
+### 3-B.8 フェーズ別実装計画
+
+| フェーズ | 実装内容 |
+|---|---|
+| **Phase 1** | Working Memory (GraphState) + Short-term (Checkpointer/SQLite) + Long-term基盤 (Store/ChromaDB/sentence-transformers) |
+| **Phase 2** | 意味検索の精度向上・メモリ自動要約（会話圧縮） |
+| **Phase 3** | ユーザーによるメモリ明示操作「覚えておいて」「忘れて」 ※TODO |
+
+> **TODO (Phase 3):** ユーザーが明示的にメモリを操作できる機能
+> - `"これは覚えておいて"` → 長期記憶へ強制保存
+> - `"さっきの話は忘れて"` → 直近N件を短期記憶から削除
+> - `"私の好みをリセット"` → `user_profile` namespace をクリア
+
+---
+
 ## 4. ディレクトリ構成
 
 ```
@@ -260,7 +385,7 @@ SelfAssistant/
 │   │   ├── __init__.py
 │   │   ├── graph.py                  # メインLangGraphグラフ
 │   │   ├── router.py                 # エージェントルーター
-│   │   ├── memory.py                 # 会話メモリ管理
+│   │   ├── memory.py                 # MemoryManager（統合メモリアクセス）
 │   │   └── planner.py                # 実行プランナー
 │   │
 │   ├── agents/                       # Layer 3
@@ -271,6 +396,13 @@ SelfAssistant/
 │   │   ├── code_agent.py             # コード支援エージェント
 │   │   ├── schedule_agent.py         # スケジュールエージェント
 │   │   └── general_agent.py          # 汎用エージェント
+│   │
+│   ├── memory/                       # メモリ管理（横断的関心事）
+│   │   ├── __init__.py
+│   │   ├── manager.py                # MemoryManager（統合インターフェース）
+│   │   ├── short_term.py             # Checkpointer管理（SQLite）
+│   │   ├── long_term.py              # Store + ChromaDB管理
+│   │   └── embeddings.py             # sentence-transformers ラッパー
 │   │
 │   ├── tools/                        # Layer 4
 │   │   ├── __init__.py
@@ -286,8 +418,9 @@ SelfAssistant/
 │       └── settings.py               # 設定管理（環境変数等）
 │
 ├── data/                             # ローカルデータ永続化
-│   ├── tasks.db                      # SQLiteデータベース
-│   └── schedules/                    # スケジュール定義ファイル
+│   ├── assistant.db                  # SQLiteデータベース（会話履歴・タスク・Store）
+│   ├── chroma/                       # ChromaDBベクトルストア
+│   └── schedules/                    # スケジュール定義YAMLファイル
 │
 ├── tests/
 │   ├── unit/
@@ -324,6 +457,8 @@ SelfAssistant/
 | 設定管理 | `pydantic-settings` | 環境変数・設定管理 |
 | Web検索 | `duckduckgo-search` | 情報収集ツール |
 | YAML管理 | `pyyaml` | スケジュール定義ファイル読み込み |
+| ベクトルDB | `chromadb` | 長期記憶の意味検索・永続化 |
+| 埋め込みモデル | `sentence-transformers` | テキスト→ベクトル変換（ローカル実行） |
 | テスト | `pytest` + `pytest-asyncio` | テストフレームワーク |
 
 ### スケジュール定義
@@ -349,13 +484,14 @@ schedules:
 ## 6. 実装フェーズ計画
 
 ### Phase 1: 基盤構築（最初の実装）
-- [ ] プロジェクト初期化（pyproject.toml, requirements.txt）
+- [ ] プロジェクト初期化（pyproject.toml, pyenv local）
 - [ ] 設定管理（`config/settings.py`）
-- [ ] Layer 4: 基本ツール実装（DB, ファイルシステム）
-- [ ] Layer 3: BaseAgent + GeneralAgent（汎用会話）
-- [ ] Layer 2: Orchestrator基本グラフ（シングルエージェント動作）
+- [ ] Layer 4: 基本ツール実装（SQLite DB）
+- [ ] メモリ基盤: Short-term（Checkpointer）+ Long-term（Store + ChromaDB + sentence-transformers）
+- [ ] Layer 3: BaseAgent + GeneralAgent（汎用会話 + メモリ連携）
+- [ ] Layer 2: Orchestrator基本グラフ（MemoryManager統合）
 - [ ] Layer 1: CLIインターフェース（対話モード）
-- [ ] 動作確認：CLIでの基本会話
+- [ ] 動作確認：CLIでの基本会話・セッション再開・長期記憶の保存と検索
 
 ### Phase 2: 専門エージェント追加
 - [ ] TaskManagementAgent + TaskDB
