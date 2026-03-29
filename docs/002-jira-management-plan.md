@@ -83,9 +83,9 @@ scripts/
     ├── issues/
     │   ├── create-issue.sh         # チケット作成
     │   ├── get-issue.sh            # チケット参照
-    │   ├── update-issue.sh         # チケット更新
     │   ├── get-issue-types.sh      # Issue種別一覧取得
     │   └── link-task-to-epic.sh    # EpicへのTask紐づけ
+    │   # update-issue.sh は Phase 2 以降で実装予定
     └── create-phase-tickets.sh     # フェーズ単位の一括チケット作成
 ```
 

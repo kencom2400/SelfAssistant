@@ -385,8 +385,8 @@ SelfAssistant/
 │   │   ├── __init__.py
 │   │   ├── graph.py                  # メインLangGraphグラフ
 │   │   ├── router.py                 # エージェントルーター
-│   │   ├── memory.py                 # MemoryManager（統合メモリアクセス）
 │   │   └── planner.py                # 実行プランナー
+│   │   # ※MemoryManagerは src/memory/manager.py に統合
 │   │
 │   ├── agents/                       # Layer 3
 │   │   ├── __init__.py

@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/../common.sh"
 ISSUE_KEY="${1:-}"
 
 if [ -z "$ISSUE_KEY" ]; then
-  echo "❌ エラー: IssueキーをI引数として指定してください" >&2
+  echo "❌ エラー: Issueキーを引数として指定してください" >&2
   echo "使用方法: $0 <issue_key>" >&2
   exit 1
 fi

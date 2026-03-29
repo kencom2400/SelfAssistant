@@ -53,10 +53,11 @@ with open(os.path.join(temp_dir, "epic_title.txt"), "w") as f:
 with open(os.path.join(temp_dir, "epic_body.txt"), "w") as f:
     f.write(epic.get("description", ""))
 
-# Task情報を保存
+# Task情報を保存（IDが連番・歯抜けでも対応できるようtask_ids.txtで管理）
 tasks = data.get("tasks", [])
-with open(os.path.join(temp_dir, "task_count.txt"), "w") as f:
-    f.write(str(len(tasks)))
+task_ids = [str(task["id"]) for task in tasks]
+with open(os.path.join(temp_dir, "task_ids.txt"), "w") as f:
+    f.write("\n".join(task_ids))
 
 for task in tasks:
     task_id = task["id"]
@@ -69,7 +70,8 @@ print(f"Epicと{len(tasks)}件のTaskを読み込みました")
 PYTHON_SCRIPT
 
 EPIC_TITLE=$(cat "${TEMP_DIR}/epic_title.txt")
-TASK_COUNT=$(cat "${TEMP_DIR}/task_count.txt")
+TASK_IDS=$(cat "${TEMP_DIR}/task_ids.txt")
+TASK_COUNT=$(echo "$TASK_IDS" | wc -l | tr -d ' ')
 
 echo "Epic: ${EPIC_TITLE}"
 echo "Tasks: ${TASK_COUNT}件"
@@ -107,7 +109,9 @@ echo ""
 CREATED_TASKS=()
 FAILED_TASKS=()
 
-for i in $(seq 1 "$TASK_COUNT"); do
+TASK_NUM=0
+for i in $TASK_IDS; do
+  TASK_NUM=$((TASK_NUM + 1))
   TASK_TITLE_FILE="${TEMP_DIR}/task_${i}_title.txt"
   TASK_BODY_FILE="${TEMP_DIR}/task_${i}_body.txt"
 
@@ -116,7 +120,7 @@ for i in $(seq 1 "$TASK_COUNT"); do
   fi
 
   TASK_TITLE=$(cat "$TASK_TITLE_FILE")
-  echo "作成中 [${i}/${TASK_COUNT}]: ${TASK_TITLE}"
+  echo "作成中 [${TASK_NUM}/${TASK_COUNT}]: ${TASK_TITLE}"
 
   TASK_OUTPUT=$("${SCRIPT_DIR}/issues/create-issue.sh" \
     --title "$TASK_TITLE" \
