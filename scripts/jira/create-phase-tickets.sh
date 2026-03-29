@@ -81,7 +81,7 @@ echo ""
 echo "🔄 Epicを作成中..."
 EPIC_OUTPUT=$("${SCRIPT_DIR}/issues/create-issue.sh" \
   --title "$EPIC_TITLE" \
-  --issue-type Epic \
+  --issue-type ストーリー \
   --body-file "${TEMP_DIR}/epic_body.txt" \
   --status ToDo)
 
@@ -120,7 +120,7 @@ for i in $(seq 1 "$TASK_COUNT"); do
 
   TASK_OUTPUT=$("${SCRIPT_DIR}/issues/create-issue.sh" \
     --title "$TASK_TITLE" \
-    --issue-type Task \
+    --issue-type タスク \
     --body-file "$TASK_BODY_FILE" \
     --status ToDo 2>&1) || true
 
