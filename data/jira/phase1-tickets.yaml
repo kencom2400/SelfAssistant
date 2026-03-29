@@ -1,0 +1,182 @@
+epic:
+  title: "Phase 1: CLIエージェントエンジン基盤構築"
+  description: |
+    SelfAssistantのPhase 1実装。
+    LangGraph + Claude API を使用したCLI会話エンジンの基盤を構築する。
+    Working Memory / Short-term Memory / Long-term Memory（ChromaDB）を実装し、
+    GeneralAgentによる汎用会話とセッション永続化を実現する。
+
+    完了基準:
+    - poetry run assistant でCLIが起動する
+    - テキストを入力するとClaude API経由で応答が返る
+    - --resume オプションで前回の会話が復元される
+    - 会話の中で重要情報が自動的に長期記憶に保存される
+    - /memories コマンドで保存済み記憶が確認できる
+    - すべてのユニットテストがパスする
+
+tasks:
+  - id: 1
+    title: "Task 1: 環境構築（pyenv + poetry + pyproject.toml）"
+    description: |
+      実装内容:
+      - pyenv local 3.12.12 の設定
+      - poetry によるプロジェクト初期化
+      - pyproject.toml への依存パッケージ定義
+        (langgraph, langchain-anthropic, anthropic, rich, click,
+         pydantic-settings, sqlalchemy, aiosqlite, chromadb,
+         sentence-transformers, pyyaml)
+      - .env / .env.example の作成
+      - pytest 設定（pytest-asyncio, pytest-cov, pytest-mock）
+
+      完了基準:
+      - poetry install が正常に完了する
+      - poetry run python --version が 3.12.x を返す
+
+  - id: 2
+    title: "Task 2: 設定管理（src/config/settings.py）"
+    description: |
+      実装内容:
+      - pydantic-settings による Settings クラスの実装
+      - .env からの環境変数ロード
+      - 設定項目: ANTHROPIC_API_KEY, MODEL, MAX_TOKENS,
+                  DB_PATH, CHROMA_PATH, EMBEDDING_MODEL,
+                  MAX_HISTORY, LONG_TERM_TOP_K
+
+      完了基準:
+      - tests/unit/test_settings.py がパスする
+      - .env 未設定時にわかりやすいエラーが出る
+
+  - id: 3
+    title: "Task 3: Embeddingsモジュール（src/memory/embeddings.py）"
+    description: |
+      実装内容:
+      - sentence-transformers の EmbeddingModel ラッパー実装
+      - モデル: intfloat/multilingual-e5-small（日本語・英語対応）
+      - encode(text) / encode_batch(texts) メソッドの実装
+      - モデルの遅延ロード（初回アクセス時に初期化）
+
+      完了基準:
+      - tests/unit/test_embeddings.py がパスする
+      - encode() が float のリストを返す
+
+  - id: 4
+    title: "Task 4: データベース基盤（src/tools/database.py）"
+    description: |
+      実装内容:
+      - SQLAlchemy + aiosqlite による非同期SQLiteアクセス
+      - data/assistant.db の初期化・マイグレーション
+      - 会話履歴テーブルのスキーマ定義
+
+      完了基準:
+      - data/assistant.db が自動生成される
+      - テーブルが正常に作成される
+
+  - id: 5
+    title: "Task 5: Short-termメモリ（src/memory/short_term.py）"
+    description: |
+      実装内容:
+      - LangGraph SqliteSaver Checkpointer の実装
+      - get_checkpointer() でグラフに渡せる形式で返す
+      - list_sessions() / delete_session() の実装
+      - セッションID: UUID v4
+
+      完了基準:
+      - tests/unit/test_short_term.py がパスする
+      - セッション保存・ロード・削除が正常に動作する
+
+  - id: 6
+    title: "Task 6: Long-termメモリ（src/memory/long_term.py）"
+    description: |
+      実装内容:
+      - ChromaDB による長期記憶の永続化
+      - namespace 管理:
+          user_profile / important_facts / task_context / conversation_summary
+      - save(content, namespace, metadata) の実装
+      - search(query, namespace, n_results) の実装（意味検索）
+      - delete(memory_id) / list_all(namespace) の実装
+
+      完了基準:
+      - tests/unit/test_long_term.py がパスする
+      - save後に search で取得できる
+
+  - id: 7
+    title: "Task 7: MemoryManager（src/memory/manager.py）"
+    description: |
+      実装内容:
+      - ShortTermMemory + LongTermMemory の統合インターフェース
+      - get_checkpointer() の委譲
+      - get_relevant_context(query) による意味検索
+      - save_memory(content, namespace, metadata) による長期記憶保存
+      - build_context_messages(conversation_history, relevant_memories) の実装
+        （max_history 件数制限 + 関連記憶のシステムプロンプト注入）
+
+      完了基準:
+      - tests/unit/test_memory_manager.py がパスする
+      - max_history を超えた場合に直近N件に制限される
+
+  - id: 8
+    title: "Task 8: BaseAgent（src/agents/base.py）"
+    description: |
+      実装内容:
+      - 全エージェント共通の抽象基底クラス
+      - run(state: GraphState) -> GraphState の抽象メソッド
+      - get_system_prompt() -> str の抽象メソッド
+      - _build_messages(state) の共通実装
+
+      完了基準:
+      - BaseAgent を継承したクラスが正常にインスタンス化できる
+
+  - id: 9
+    title: "Task 9: GeneralAgent（src/agents/general_agent.py）"
+    description: |
+      実装内容:
+      - BaseAgent を継承した汎用会話エージェント
+      - Claude API（Messages API）への接続
+      - tool_use による save_to_memory ツール定義と実行
+        （重要情報を自動検出して長期記憶に保存）
+      - 会話履歴の更新処理
+
+      完了基準:
+      - tests/unit/test_general_agent.py がパスする（LLMモック使用）
+      - ツール呼び出しありのケースで長期記憶が保存される
+
+  - id: 10
+    title: "Task 10: Router（src/orchestrator/router.py）"
+    description: |
+      実装内容:
+      - Phase 1: 常に general_agent へルーティング
+      - AGENT_MAP の定義（Phase 2以降の拡張用）
+      - route(state) メソッドの実装
+
+      完了基準:
+      - tests/unit/test_router.py がパスする
+      - 任意の入力で selected_agent = "general_agent" が返る
+
+  - id: 11
+    title: "Task 11: Orchestratorグラフ（src/orchestrator/graph.py）"
+    description: |
+      実装内容:
+      - LangGraph StateGraph によるメイングラフの構築
+      - GraphState TypedDict の定義
+      - ノード: input_processor / router / general_agent / response_formatter
+      - SqliteSaver Checkpointer の組み込み
+      - session_id による会話セッション管理
+
+      完了基準:
+      - tests/integration/test_graph_flow.py がパスする
+      - セッション再開で会話履歴が復元される
+
+  - id: 12
+    title: "Task 12: CLIインターフェース（src/interface/cli.py）"
+    description: |
+      実装内容:
+      - Rich を使用したインタラクティブCLI
+      - poetry run assistant コマンドの実装
+      - --resume / --session-id オプション
+      - 特殊コマンド: /exit / /history / /memories / /sessions / /help
+
+      完了基準:
+      - poetry run assistant で起動する
+      - テキストを入力するとClaude API経由で応答が返る
+      - --resume で前回の会話が復元される
+      - /memories で保存済み長期記憶が表示される

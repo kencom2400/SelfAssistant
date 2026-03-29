@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# このファイルをコピーして config.local.sh を作成してください
+# cp scripts/jira/config.local.sh.example scripts/jira/config.local.sh
+#
+# config.local.sh は .gitignore に追加されており、Git にコミットされません
+
+export JIRA_EMAIL='your-email@example.com'
+export JIRA_API_TOKEN='your-api-token'
+
+# オプション（通常は config.sh の値を使用するため不要）
+# export JIRA_BASE_URL='https://kencom2400.atlassian.net'
