@@ -81,7 +81,7 @@ echo ""
 echo "🔄 Epicを作成中..."
 EPIC_OUTPUT=$("${SCRIPT_DIR}/issues/create-issue.sh" \
   --title "$EPIC_TITLE" \
-  --issue-type ストーリー \
+  --issue-type エピック \
   --body-file "${TEMP_DIR}/epic_body.txt" \
   --status ToDo)
 

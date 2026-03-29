@@ -90,6 +90,8 @@ handle_jira_error() {
 }
 
 # Issue種別IDをAPIから動的に取得
+# createmeta はエピック・サブタスクを返さない場合があるため
+# /project/{key} エンドポイントを使用する
 # 引数: project_key issue_type_name
 get_issue_type_id_from_api() {
   local project_key="$1"
@@ -100,11 +102,11 @@ get_issue_type_id_from_api() {
   fi
 
   local issue_types_data
-  issue_types_data=$(jira_api_call "GET" "issue/createmeta?projectKeys=${project_key}&expand=projects.issuetypes") || return 1
+  issue_types_data=$(jira_api_call "GET" "project/${project_key}") || return 1
 
   local issue_type_id
   issue_type_id=$(echo "$issue_types_data" | jq -r --arg name "$issue_type_name" \
-    '.projects[0].issuetypes[] | select(.name | test($name; "i")) | .id' | head -n 1)
+    '.issueTypes[] | select(.name | test($name; "i")) | .id' | head -n 1)
 
   if [ -z "$issue_type_id" ] || [ "$issue_type_id" = "null" ]; then
     return 1

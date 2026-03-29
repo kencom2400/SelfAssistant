@@ -10,7 +10,7 @@ PROJECT_KEY="${1:-${JIRA_PROJECT_KEY:-SA}}"
 
 echo "🔍 プロジェクト '${PROJECT_KEY}' のIssue種別を取得中..."
 
-response=$(jira_api_call "GET" "issue/createmeta?projectKeys=${PROJECT_KEY}&expand=projects.issuetypes")
+response=$(jira_api_call "GET" "project/${PROJECT_KEY}")
 
 if [ $? -ne 0 ]; then
   echo "❌ Issue種別の取得に失敗しました" >&2
@@ -19,4 +19,4 @@ fi
 
 echo ""
 echo "利用可能なIssue種別:"
-echo "$response" | jq -r '.projects[0].issuetypes[] | "  ID: \(.id)  名前: \(.name)"'
+echo "$response" | jq -r '.issueTypes[] | "  ID: \(.id)  名前: \(.name)  サブタスク: \(.subtask)"'
