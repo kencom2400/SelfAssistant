@@ -1,7 +1,9 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
-from self_assistant.config.settings import Settings, get_settings
+from self_assistant.config.settings import Settings, _PROJECT_ROOT, get_settings
 
 
 class TestSettings:
@@ -9,8 +11,11 @@ class TestSettings:
         s = Settings(anthropic_api_key="test-key")
         assert s.model == "claude-sonnet-4-6"
         assert s.max_tokens == 4096
-        assert s.db_path == "data/assistant.db"
-        assert s.chroma_path == "data/chroma"
+        # デフォルトパスはプロジェクトルート基準の絶対パス
+        assert s.db_path == str(_PROJECT_ROOT / "data" / "assistant.db")
+        assert s.chroma_path == str(_PROJECT_ROOT / "data" / "chroma")
+        assert Path(s.db_path).is_absolute()
+        assert Path(s.chroma_path).is_absolute()
         assert s.embedding_model == "intfloat/multilingual-e5-small"
         assert s.max_history == 20
         assert s.long_term_top_k == 3
