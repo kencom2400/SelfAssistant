@@ -75,31 +75,31 @@ build-backend = "poetry.core.masonry.api"
 ```
 SelfAssistant/
 ├── src/
-│   ├── __init__.py
-│   ├── config/
-│   │   ├── __init__.py
-│   │   └── settings.py
-│   ├── memory/
-│   │   ├── __init__.py
-│   │   ├── manager.py
-│   │   ├── short_term.py
-│   │   ├── long_term.py
-│   │   └── embeddings.py
-│   ├── tools/
-│   │   ├── __init__.py
-│   │   └── database.py
-│   ├── agents/
-│   │   ├── __init__.py
-│   │   ├── base.py
-│   │   └── general_agent.py
-│   ├── orchestrator/
-│   │   ├── __init__.py
-│   │   ├── graph.py
-│   │   ├── router.py
-│   │   └── memory.py
-│   └── interface/
+│   └── self_assistant/          # Pythonパッケージルート
 │       ├── __init__.py
-│       └── cli.py
+│       ├── config/
+│       │   ├── __init__.py
+│       │   └── settings.py
+│       ├── memory/
+│       │   ├── __init__.py
+│       │   ├── manager.py
+│       │   ├── short_term.py
+│       │   ├── long_term.py
+│       │   └── embeddings.py
+│       ├── tools/
+│       │   ├── __init__.py
+│       │   └── database.py
+│       ├── agents/
+│       │   ├── __init__.py
+│       │   ├── base.py
+│       │   └── general_agent.py
+│       ├── orchestrator/
+│       │   ├── __init__.py
+│       │   ├── graph.py
+│       │   └── router.py
+│       └── interface/
+│           ├── __init__.py
+│           └── cli.py
 ├── data/
 │   ├── assistant.db       # 自動生成
 │   └── chroma/            # 自動生成
