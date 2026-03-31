@@ -60,7 +60,6 @@ class TestEmbeddingModel:
         em.encode("first")
         em.encode("second")
         # SentenceTransformerのコンストラクタは1回だけ
-        from self_assistant.memory import embeddings as emb_mod
         assert em._model is mock_st
 
     def test_encode_returns_list(self, mock_model):
